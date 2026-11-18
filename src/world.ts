@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { animatePerson, bicycle, box, cylinder, material, motorcycle, person, sign, sphere, tree } from './scene-assets';
 
 export interface WorldResult {
+  group: THREE.Group;
   spawn: THREE.Vector3;
   colliders: { x: number; z: number; hx: number; hz: number }[];
   interactables: { id: string; label: string; kind: string; x: number; z: number }[];
@@ -247,7 +248,7 @@ export function createWorld(scene: THREE.Scene): WorldResult {
   const sun = new THREE.Mesh(new THREE.CircleGeometry(0.44, 18), material('#ba5743')); sun.position.set(1.06, 8.2, 0.03); flag.add(sun);
 
   return {
-    spawn: new THREE.Vector3(0, 0, 10), colliders, interactables, landmarks,
+    group: village, spawn: new THREE.Vector3(0, 0, 10), colliders, interactables, landmarks,
     update(dt, time) {
       for (let i = 0; i < markers.length; i++) { const marker = markers[i]!; marker.position.y = 2.12 + Math.sin(time * 1.7 + i) * 0.12; marker.rotation.y += dt * 0.7; }
       for (const item of animated) {

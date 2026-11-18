@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import './style.css';
 import { createWorld } from './world';
-import { loadSourceMap } from './source-map';
+import { loadMapSnapshot, loadSourceMap } from './source-map';
+import { createRegionalWorld } from './regional-world';
 import { person, bicycle, motorcycle, box, animatePerson } from './scene-assets';
 import { createGameState, performAction, advanceSimulation, saveGame, loadGame, formatTime } from './simulation';
 import { mountUI, type HUDView } from './ui';
@@ -31,6 +32,8 @@ sun.shadow.mapSize.set(2048, 2048); sun.shadow.camera.left = -120; sun.shadow.ca
 sun.shadow.camera.top = 120; sun.shadow.camera.bottom = -120; sun.shadow.normalBias = 0.035;
 scene.add(sun); scene.add(sun.target);
 const world = createWorld(scene);
+let region: ReturnType<typeof createRegionalWorld> | undefined;
+let villageReturn: { position: THREE.Vector3; yaw: number; pitch: number; heading: number } | undefined;
 let state = loadGame() ?? createGameState();
 let started = false, yaw = 0, pitch = 0.31, speed = 0, elapsed = 0, hudTimer = 0, autosave = 0;
 let routeTarget: string | null = null, policeWarned = false;
@@ -66,7 +69,12 @@ function chime(freq = 540, length = 0.08) {
 }
 function persist(quiet = false) {
   const saved = saveGame(state);
-  try { localStorage.setItem('chilahati-life-position-v1', JSON.stringify({ x:position.x,z:position.z,yaw })); } catch {}
+  const savedPosition = villageReturn?.position ?? position;
+  try {
+    localStorage.setItem('chilahati-life-position-v1', JSON.stringify({
+      x: savedPosition.x, z: savedPosition.z, yaw: villageReturn?.yaw ?? yaw,
+    }));
+  } catch {}
   if (!quiet) ui.toast(saved ? 'Your village life is saved on this device.' : 'Saving is unavailable. Check browser storage permissions.');
 }
 function restorePosition() {
@@ -103,9 +111,80 @@ function collides(x:number,z:number) {
   const radius=state.vehicle==='walk'?0.45:0.85;
   return world.colliders.some(b=>Math.abs(x-b.x)<b.hx+radius&&Math.abs(z-b.z)<b.hz+radius);
 }
+function resetMovement() {
+  input.clear();
+  speed = 0;
+  walkVelocity.set(0, 0, 0);
+  gaitAmount = 0;
+}
+
+async function exploreRegion() {
+  const button = document.querySelector<HTMLButtonElement>('[data-action="explore-region"]');
+  if (!button || button.disabled || villageReturn) return;
+  button.disabled = true;
+  if (!region) {
+    ui.toast('Loading mapped roads and railway…');
+    const snapshot = await loadMapSnapshot();
+    if (!button.isConnected || !ui.isPanelOpen()) return;
+    if (!snapshot) {
+      button.disabled = false;
+      ui.toast('The regional map is unavailable in this copy.');
+      return;
+    }
+    try {
+      region = createRegionalWorld(snapshot);
+      scene.add(region.group);
+    } catch {
+      button.disabled = false;
+      ui.toast('The regional map could not be opened.');
+      return;
+    }
+  }
+  villageReturn = { position: position.clone(), yaw, pitch, heading: player.rotation.y };
+  position.copy(region.spawn);
+  yaw = region.yaw;
+  pitch = 0.26;
+  player.rotation.y = (state.vehicle === 'walk' ? Math.PI : 0) - yaw;
+  world.group.visible = false;
+  region.group.visible = true;
+  officer.visible = false;
+  marker.visible = false;
+  resetMovement();
+  ui.closePanel();
+  ui.toast('Follow the mapped roads. Open the guide to return to village life.');
+  updateHUD();
+}
+
+function returnToVillage() {
+  if (!villageReturn || !region) return;
+  position.copy(villageReturn.position);
+  yaw = villageReturn.yaw;
+  pitch = villageReturn.pitch;
+  player.rotation.y = villageReturn.heading;
+  villageReturn = undefined;
+  world.group.visible = true;
+  region.group.visible = false;
+  resetMovement();
+  ui.closePanel();
+  updateHUD();
+}
+
+function canMoveTo(x: number, z: number) {
+  if (!villageReturn || !region) return Math.abs(x) < 1050 && Math.abs(z) < 1050 && !collides(x, z);
+  const { minX, maxX, minZ, maxZ } = region.bounds;
+  return x >= minX && x <= maxX && z >= minZ && z <= maxZ;
+}
+
 function doAction(action:string) {
-  if(action.startsWith('navigate-')) { navigate(action.slice(9));return; }
+  if (action === 'explore-region') { void exploreRegion(); return; }
+  if (action === 'return-village') { returnToVillage(); return; }
   if(action==='save'){persist();return;}
+  if(action==='map'||action==='help'||action==='inventory'||action==='settings'){ui.openPanel(action);return;}
+  if (villageReturn) {
+    ui.toast('Return to village life from the guide to use village services.');
+    return;
+  }
+  if(action.startsWith('navigate-')) { navigate(action.slice(9));return; }
   if(action==='interact'){
     if(state.heat>0&&officer.visible&&officer.position.distanceTo(position)<5){ui.openPanel('police');return;}
     const n=nearest();
@@ -113,7 +192,6 @@ function doAction(action:string) {
     else ui.toast('Walk toward a gold marker to meet someone or visit a place.');
     return;
   }
-  if(action==='map'||action==='help'||action==='inventory'||action==='settings'){ui.openPanel(action);return;}
   if(action==='transport'||action==='vehicle'){ui.openPanel('rental');return;}
   let at:string|undefined;
   if(/^(rent|buy)-(van|bicycle|motorcycle)$/.test(action))at='rental';
@@ -161,11 +239,12 @@ applyQuality();
 const controls:Record<string,string>={KeyW:'forward',ArrowUp:'forward',KeyS:'backward',ArrowDown:'backward',KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right',ShiftLeft:'sprint',ShiftRight:'sprint',Space:'brake'};
 addEventListener('keydown',e=>{
   if((e.target as HTMLElement)?.matches('input,select,textarea'))return;
+  if(e.code==='Space'&&(e.target as HTMLElement)?.closest('button,a'))return;
   if(controls[e.code]){input.add(controls[e.code]);e.preventDefault();}
   if(e.repeat||!started)return;
   if(e.code==='KeyE')doAction('interact');
   if(e.code==='KeyM')ui.openPanel('map');
-  if(e.code==='KeyV')ui.openPanel('rental');
+  if(e.code==='KeyV')doAction('vehicle');
   if(e.code==='KeyI')ui.openPanel('inventory');
   if(e.code==='KeyX')doAction('dismount');
   if(e.code==='KeyH')ui.openPanel('help');
@@ -185,8 +264,8 @@ function updateHUD() {
   const n=nearest();
   const target=routeTarget?world.interactables.find(p=>p.id===routeTarget):undefined;
   const distance=target?Math.round(Math.hypot(position.x-target.x,position.z-target.z)):0;
-  const location=n.distance<28&&n.point?n.point.label:'Chilahati village';
-  const job=state.job.active?'Deliver the parcel to the school'+(target?' · '+distance+' m':''):target?'Visit '+target.label+' · '+distance+' m':'Find your first job at the post office';
+  const location=villageReturn?'Mapped Chilahati':n.distance<28&&n.point?n.point.label:'Chilahati village';
+  const job=villageReturn?'Explore mapped roads and railway':state.job.active?'Deliver the parcel to the school'+(target?' · '+distance+' m':''):target?'Visit '+target.label+' · '+distance+' m':'Find your first job at the post office';
   const gameMinute = (state.day - 1) * 1440 + state.minutes;
   const work = {
     lessons: state.lessonCount,
@@ -196,12 +275,13 @@ function updateHUD() {
     teaStall: state.teaStall,
     teaOrderReady: gameMinute >= state.teaStall.orderAvailableAt,
   };
-  const view:HUDView={cash:state.cash,debt:state.debt,trust:state.trust,heat:state.heat,energy:state.energy,time:formatTime(state.minutes),day:state.day,vehicle:state.vehicle,location,prompt:n.point&&n.distance<8?n.point.label:'Explore the village',job,fps,ownedVehicles:state.ownedVehicles,ownsHome:state.ownsHome,inventory:state.inventory,log:state.log,started,work};
+  const view:HUDView={cash:state.cash,debt:state.debt,trust:state.trust,heat:state.heat,energy:state.energy,time:formatTime(state.minutes),day:state.day,vehicle:state.vehicle,location,prompt:villageReturn?'':n.point&&n.distance<8?n.point.label:'Explore the village',job,fps,ownedVehicles:state.ownedVehicles,ownsHome:state.ownsHome,inventory:state.inventory,log:state.log,started,exploring:!!villageReturn,work};
   ui.update(view); drawMap();
 }
 const drawSourceMap = loadSourceMap();
 function drawMap(){
   const map=document.querySelector<HTMLCanvasElement>('#village-map');
+  drawSourceMap(villageReturn ? position : undefined);
   if(!map)return;
   const ctx=map.getContext('2d');if(!ctx)return;
   const w=map.width=640,h=map.height=440;
@@ -215,7 +295,6 @@ function drawMap(){
   for(const p of world.interactables){ctx.fillStyle='#b4862e';ctx.beginPath();ctx.arc(px(p.x),pz(p.z),4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#193f32';ctx.fillText(p.label,px(p.x)+8,pz(p.z)-8);}
   ctx.fillStyle='#c8543b';ctx.beginPath();ctx.arc(px(position.x),pz(position.z),6,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='#193f32';ctx.font='bold 13px system-ui';ctx.fillText('Playable station-area guide · illustrative layout',15,h-38);
-  drawSourceMap();
 }
 let frameCount=0,fps=60,fpsTime=0;
 let last=performance.now();
@@ -232,9 +311,11 @@ function frame(now:number){
   if(fpsTime>1){fps=Math.round(frameCount/fpsTime);frameCount=0;fpsTime=0;}
   const paused=ui.isPanelOpen();
   if(started&&!paused){
-    const events=advanceSimulation(state,dt);
-    if(events.azan)ui.toast(events.azan+' · demo game-clock prayer event. Azan recording pending local approval.');
-    if(events.message)ui.toast(events.message);
+    if (!villageReturn) {
+      const events=advanceSimulation(state,dt);
+      if(events.azan)ui.toast(events.azan+' · demo game-clock prayer event. Azan recording pending local approval.');
+      if(events.message)ui.toast(events.message);
+    }
     const forward=(input.has('forward')?1:0)-(input.has('backward')?1:0);
     const turn=(input.has('right')?1:0)-(input.has('left')?1:0);
     let dx=0,dz=0;
@@ -248,25 +329,27 @@ function frame(now:number){
       const actualSpeed = Math.hypot(walkVelocity.x, walkVelocity.z);
       gaitAmount = THREE.MathUtils.damp(gaitAmount, Math.min(actualSpeed / 3.8, 1), 10, dt);
       gaitPhase += actualSpeed * dt * 4.1;
-      if(actualSpeed>0.08){const desiredAngle=Math.atan2(dx,dz);const difference=THREE.MathUtils.euclideanModulo(desiredAngle-player.rotation.y+Math.PI,Math.PI*2)-Math.PI;player.rotation.y+=difference*(1-Math.exp(-dt*12));if(input.has('sprint'))state.energy=Math.max(0,state.energy-dt*0.25);}
+      if(actualSpeed>0.08){const desiredAngle=Math.atan2(dx,dz);const difference=THREE.MathUtils.euclideanModulo(desiredAngle-player.rotation.y+Math.PI,Math.PI*2)-Math.PI;player.rotation.y+=difference*(1-Math.exp(-dt*12));if(!villageReturn&&input.has('sprint'))state.energy=Math.max(0,state.energy-dt*0.25);}
     }else{
       const max=state.vehicle==='motorcycle'?17:state.vehicle==='bicycle'?9.5:8;
       speed=THREE.MathUtils.damp(speed,forward*max,input.has('brake')?12:2.4,dt);
       yaw+=turn*dt*(speed<0?-1:1)*1.5*(Math.abs(speed)>0.3?1:0.4);
       dx=Math.sin(yaw)*speed*dt;dz=-Math.cos(yaw)*speed*dt;player.rotation.y=-yaw;
-      if(state.vehicle==='bicycle'&&Math.abs(speed)>2)state.energy=Math.max(0,state.energy-dt*0.06);
+      if(!villageReturn&&state.vehicle==='bicycle'&&Math.abs(speed)>2)state.energy=Math.max(0,state.energy-dt*0.06);
     }
-    if(Math.abs(position.x+dx)<1050&&!collides(position.x+dx,position.z))position.x+=dx;else speed*=0.3;
-    if(Math.abs(position.z+dz)<1050&&!collides(position.x,position.z+dz))position.z+=dz;else speed*=0.3;
-    const target=routeTarget?world.interactables.find(p=>p.id===routeTarget):undefined;
-    marker.visible=!!target;
-    if(target){marker.position.set(target.x,0.12,target.z);marker.scale.setScalar(1+Math.sin(elapsed*3)*0.1);if(isNear(routeTarget!,5)){routeTarget=null;ui.toast('You have arrived. Press E or tap Interact.');}}
-    if(state.heat>0){
-      officer.visible=true;
-      const direction=position.clone().sub(officer.position);direction.y=0;
-      if(direction.length()>3){officer.position.addScaledVector(direction.normalize(),dt*3.5);officer.rotation.y=Math.atan2(direction.x,direction.z);}
-      else if(!policeWarned){policeWarned=true;ui.toast('An officer wants to speak to you. Interact to resolve the complaint.');}
-    }else officer.visible=false;
+    if(canMoveTo(position.x+dx,position.z))position.x+=dx;else speed*=0.3;
+    if(canMoveTo(position.x,position.z+dz))position.z+=dz;else speed*=0.3;
+    if (!villageReturn) {
+      const target=routeTarget?world.interactables.find(p=>p.id===routeTarget):undefined;
+      marker.visible=!!target;
+      if(target){marker.position.set(target.x,0.12,target.z);marker.scale.setScalar(1+Math.sin(elapsed*3)*0.1);if(isNear(routeTarget!,5)){routeTarget=null;ui.toast('You have arrived. Press E or tap Interact.');}}
+      if(state.heat>0){
+        officer.visible=true;
+        const direction=position.clone().sub(officer.position);direction.y=0;
+        if(direction.length()>3){officer.position.addScaledVector(direction.normalize(),dt*3.5);officer.rotation.y=Math.atan2(direction.x,direction.z);}
+        else if(!policeWarned){policeWarned=true;ui.toast('An officer wants to speak to you. Interact to resolve the complaint.');}
+      }else officer.visible=false;
+    }
     autosave+=dt;if(autosave>25){persist(true);autosave=0;}
   }
   player.position.copy(position);
@@ -286,12 +369,12 @@ function frame(now:number){
   const daylight=THREE.MathUtils.clamp(Math.sin((time-6)/12*Math.PI),0.08,1);
   hemi.intensity=1.0+daylight*1.35;sun.intensity=0.25+daylight*3;
   sun.position.set(position.x-65,80,position.z+35);sun.target.position.copy(position);
-  world.update(paused&&started?0:dt,elapsed);
+  if (!villageReturn) world.update(paused&&started?0:dt,elapsed);
   renderer.render(scene,camera);
   hudTimer+=dt;if(hudTimer>0.16){hudTimer=0;updateHUD();}
 }
 camera.position.set(24,12,36);camera.lookAt(0,3,-24);
 requestAnimationFrame(frame);
 updateHUD();
-Object.assign(window,{chilahatiDebug:{get state(){return state;},get position(){return {x:position.x,z:position.z};},get world(){return world;},perform:doAction}});
+Object.assign(window,{chilahatiDebug:{get state(){return state;},get position(){return {x:position.x,z:position.z};},get world(){return world;},get exploring(){return !!villageReturn;},perform:doAction}});
 

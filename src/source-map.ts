@@ -1,5 +1,5 @@
 type Point = { x: number; z: number };
-type Snapshot = {
+export type Snapshot = {
   origin: { lat: number; lon: number };
   bounds: { south: number; west: number; north: number; east: number };
   roads: { points: Point[]; kind: string }[];
@@ -8,23 +8,32 @@ type Snapshot = {
   fetchedAt: string;
 };
 
-export function loadSourceMap() {
-  const fetchSnapshot = () => fetch('./data/chilahati-map.json')
+let snapshotRequest: Promise<Snapshot | null> | undefined;
+
+export function loadMapSnapshot() {
+  snapshotRequest ??= fetch('./data/chilahati-map.json')
     .then(async response => {
       if (!response.ok) return null;
       const data: Snapshot = await response.json();
       return data.roads.length && data.rails.length && data.bounds && data.origin ? data : null;
     })
-    .catch(() => null);
-  let request: ReturnType<typeof fetchSnapshot> | undefined;
+    .catch(() => null)
+    .then(snapshot => {
+      if (!snapshot) snapshotRequest = undefined;
+      return snapshot;
+    });
+  return snapshotRequest;
+}
+
+export function loadSourceMap() {
   let current: HTMLCanvasElement | null = null;
 
-  return function drawSourceMap() {
+  return function drawSourceMap(playerPosition?: Point) {
     const canvas = document.querySelector<HTMLCanvasElement>('#source-map');
     if (!canvas || canvas === current) return;
     current = canvas;
-    request ??= fetchSnapshot();
-    void request.then(snapshot => {
+    const player = playerPosition && { x: playerPosition.x, z: playerPosition.z };
+    void loadMapSnapshot().then(snapshot => {
       if (!canvas.isConnected) return;
       const status = document.querySelector('#source-map-status');
       if (!snapshot) {
@@ -74,7 +83,16 @@ export function loadSourceMap() {
         ctx.strokeText(station.name, x(station) + 10, y(station) - 8);
         ctx.fillText(station.name, x(station) + 10, y(station) - 8);
       }
-      if (status) status.textContent = `${snapshot.roads.length} mapped road ways and ${snapshot.rails.length} railway ways. Retrieved ${snapshot.fetchedAt.slice(0, 10)}.`;
+      if (player) {
+        ctx.fillStyle = '#245e75';
+        ctx.strokeStyle = '#f9f3df';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x(player), y(player), 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      if (status) status.textContent = `${player ? 'Blue dot: your location. ' : ''}${snapshot.roads.length} mapped road ways and ${snapshot.rails.length} railway ways. Retrieved ${snapshot.fetchedAt.slice(0, 10)}.`;
       canvas.hidden = false;
     });
   };
