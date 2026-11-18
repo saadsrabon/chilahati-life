@@ -19,7 +19,9 @@ The published Linux x86_64 runtime verified canonical GitHub main at `a72546c479
 
 The geographic acquisition result and its limits are recorded in [MAP_SOURCES.md](MAP_SOURCES.md).
 
-Cloud Chromium 156 rendered the source map at 1280×800 desktop and at 393×852 portrait and 852×393 landscape using Android touch emulation. It displayed the extract counts and visible linked attribution, with no horizontal overflow or JavaScript errors in those checks. On the baseline, desktop keyboard movement, Escape, motorcycle rental and save/reload passed. Emulated touch moved the player and opened and closed the transport menu in both orientations. A short SwiftShader sample measured roughly 6 FPS at desktop size and 11 FPS at the emulated sizes. Physical Android and PC GPU performance remain unverified.
+Cloud Chromium 156 rendered the source map at 1280×800 desktop and at 393×852 portrait and 852×393 landscape using Android touch emulation. It displayed the extract counts and visible linked attribution, with no horizontal overflow or JavaScript errors in those checks. On the baseline, desktop keyboard movement, Escape, motorcycle rental and save/reload passed. Emulated touch moved the player and opened and closed the transport menu in both orientations. A short SwiftShader sample measured roughly 6 FPS at desktop size and 11 FPS at the emulated sizes. The HUD now measures real frame intervals. Physical Android and PC GPU performance remain unverified.
+
+Browser checks also opened a tea stall on desktop, served an order, checked the sale cooldown and focus, restocked, and reloaded with the same cash and stock. Pixel 7 emulation used a save at the school with the teaching prerequisites met, completed a paid class via touch, and confirmed the daily limit. Twelve simulation tests and the production build passed, including migration from prior version-one saves.
 
 ## Implemented prototype features
 

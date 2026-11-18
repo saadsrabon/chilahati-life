@@ -223,7 +223,12 @@ const desiredCamera=new THREE.Vector3();
 const targetLook=new THREE.Vector3();
 function frame(now:number){
   requestAnimationFrame(frame);
-  const dt=Math.min((now-last)/1000,0.05);last=now;elapsed+=dt;frameCount++;fpsTime+=dt;
+  const frameSeconds = (now - last) / 1000;
+  const dt = Math.min(frameSeconds, 0.05);
+  last = now;
+  elapsed += dt;
+  frameCount++;
+  fpsTime += frameSeconds;
   if(fpsTime>1){fps=Math.round(frameCount/fpsTime);frameCount=0;fpsTime=0;}
   const paused=ui.isPanelOpen();
   if(started&&!paused){
