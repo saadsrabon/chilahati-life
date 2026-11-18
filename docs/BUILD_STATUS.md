@@ -4,6 +4,23 @@ Checkpoint dated 18 November 2026, Bangladesh time.
 
 The first browser-playable 3D prototype is deployed at [chilahati-life.vercel.app](https://chilahati-life.vercel.app). Source is available in the [GitHub repository](https://github.com/saadsrabon/chilahati-life). Pull requests [1](https://github.com/saadsrabon/chilahati-life/pull/1) and [2](https://github.com/saadsrabon/chilahati-life/pull/2) have been merged.
 
+## Managed cloud milestone
+
+The published Linux x86_64 runtime verified canonical GitHub main at `a72546c479f52c5e1fa67ffd455442a3500a2b3b` in `/workspace/chilahati-life` with Node.js v24.22.1. Clean install, nine baseline tests and the production build passed.
+
+| Phase | Cloud status |
+| --- | --- |
+| 1. World survey | Partial. Acquired a bounded OSM extract and documented coverage and unresolved anchors. Boundary and local verification remain open. |
+| 2. Whole-area foundation | Partial. The village guide displays genuine roads, railway and station point in a regional source view. Playable 3D roads and landmark placements still need integration. |
+| 3. Playable demonstration | Prototype playable. Local prayer timing and licensed azan remain open. |
+| 4. First full gameplay release | Partial. Added school tutoring and teaching progression and a tea stall with stock, sales cooldowns and saved progress. Required markets, shopkeeping and further jobs remain open. |
+| 5. Local detail and depth | Partial prototype references and art. Current signage, facades and local review remain open. |
+| 6. Expansion | Pending. |
+
+The geographic acquisition result and its limits are recorded in [MAP_SOURCES.md](MAP_SOURCES.md).
+
+Cloud Chromium 156 rendered the source map at 1280×800 desktop and at 393×852 portrait and 852×393 landscape using Android touch emulation. It displayed the extract counts and visible linked attribution, with no horizontal overflow or JavaScript errors in those checks. On the baseline, desktop keyboard movement, Escape, motorcycle rental and save/reload passed. Emulated touch moved the player and opened and closed the transport menu in both orientations. A short SwiftShader sample measured roughly 6 FPS at desktop size and 11 FPS at the emulated sizes. Physical Android and PC GPU performance remain unverified.
+
 ## Implemented prototype features
 
 - Interactive Three.js village scene with a station, railway, market scenery, Bengali signs, mosque, post office, school and homes. Current landmark models and facades are illustrative.

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   advanceSimulation, createGameState, formatTime, loadGame, normalizeSavedGame,
-  performAction, saveGame, SAVE_KEY,
+  performAction, saveGame, SAVE_KEY, SCHOOL_WORK, TEA_STALL,
 } from './simulation.ts';
 
 test('purchases reject insufficient funds without changing balances or ownership', () => {
@@ -120,6 +120,63 @@ test('time crosses midnight correctly and rejects invalid deltas', () => {
   assert.equal(state.minutes, 1);
   assert.equal(formatTime(490), '08:10');
   assert.equal(formatTime(-1), '23:59');
+});
+
+test('lessons unlock tutoring, then experience unlocks a single paid class per day', () => {
+  const state = createGameState();
+  assert.equal(performAction(state, 'tutor').ok, false);
+  for (let i = 0; i < SCHOOL_WORK.teacherLessons; i += 1) {
+    assert.equal(performAction(state, 'study').ok, true);
+    advanceSimulation(state, 75);
+  }
+  assert.equal(performAction(state, 'teach').ok, false);
+  for (let i = 0; i < SCHOOL_WORK.teacherExperience; i += 1) {
+    assert.equal(performAction(state, 'tutor').ok, true);
+    assert.equal(performAction(state, 'tutor').ok, false);
+    advanceSimulation(state, 120);
+  }
+  assert.equal(performAction(state, 'teach').ok, true);
+  const earned = SCHOOL_WORK.tutoringPay * SCHOOL_WORK.teacherExperience + SCHOOL_WORK.teacherPay;
+  assert.equal(state.cash, 650 + earned);
+  assert.equal(state.stats.earned, earned);
+  advanceSimulation(state, 150);
+  assert.equal(performAction(state, 'teach').ok, false);
+  const restored = normalizeSavedGame(state)!;
+  assert.deepEqual(restored.career, state.career);
+  restored.minutes = 1439;
+  advanceSimulation(restored, 5);
+  assert.equal(performAction(restored, 'teach').ok, true);
+});
+
+test('a tea counter has startup costs, finite stock, timed sales and saved progress', () => {
+  const state = createGameState();
+  assert.equal(performAction(state, 'serve-tea-order').ok, false);
+  assert.equal(performAction(state, 'open-tea-stall').ok, true);
+  assert.equal(performAction(state, 'open-tea-stall').ok, false);
+  assert.equal(state.cash, 650 - TEA_STALL.openingCost);
+  for (let order = 0; order < TEA_STALL.stockPack; order += 1) {
+    assert.equal(performAction(state, 'serve-tea-order').ok, true);
+    assert.equal(performAction(state, 'serve-tea-order').ok, false);
+    advanceSimulation(state, 30);
+  }
+  assert.equal(performAction(state, 'serve-tea-order').ok, false);
+  assert.equal(state.teaStall.ingredients, 0);
+  assert.equal(state.stats.earned, TEA_STALL.stockPack * TEA_STALL.pricePerOrder);
+  assert.equal(performAction(state, 'restock-tea-stall').ok, true);
+  assert.equal(state.cash, 650 - TEA_STALL.openingCost + state.stats.earned - TEA_STALL.stockCost);
+  assert.deepEqual(normalizeSavedGame(state)?.teaStall, state.teaStall);
+});
+
+test('earlier version-one saves retain progress and start with no school work or business history', () => {
+  const state = createGameState();
+  const { career, teaStall, ...earlierSave } = state;
+  earlierSave.cash = 980;
+  earlierSave.lessonCount = 4;
+  const restored = normalizeSavedGame(earlierSave);
+  assert.equal(restored?.cash, 980);
+  assert.equal(restored?.lessonCount, 4);
+  assert.deepEqual(restored?.career, career);
+  assert.deepEqual(restored?.teaStall, teaStall);
 });
 
 test('demo prayer events occur once and long time skips do not queue old calls', () => {
