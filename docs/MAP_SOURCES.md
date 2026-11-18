@@ -10,7 +10,9 @@ To refresh on the managed runtime, run `NODE_USE_ENV_PROXY=1 node scripts/fetch-
 
 ## Coverage and game integration
 
-The in-game **Guide** shows the regional source map, with the railway and mapped station identified, below the illustrative playable area guide. The extract bounds describe the requested development rectangle. Full OSM ways can extend beyond it. Road classifications and building outlines come from OSM and require local verification. The playable 3D scene still uses the prototype layout.
+The in-game **Guide** shows the regional source map, with the railway and mapped station identified, below the illustrative playable area guide. The extract bounds describe the requested development rectangle. Full OSM ways can extend beyond it. Road classifications and building outlines come from OSM and require local verification. In the Guide, **Explore mapped Chilahati** opens an explorable 3D area that uses the same source coordinates. The main village activities remain in the prototype district. The visit starts on the mapped road nearest the station point, about 80 metres away. **Return to village life** restores the prior village position, view, vehicle and progression. Saving during a visit stores the village return point. Village time and activities pause during the visit.
+
+The mapped scene clips centerlines to the extract bounds and batches roads and rail into two meshes. Ground is flat. Road surfaces and widths, rail gauge and the station marker artwork are illustrative. Building outlines are available in the extract and are pending 3D integration. The map does not establish landmark entrances, road crossings at different elevations, or named market positions.
 
 | Place | Evidence and remaining work |
 | --- | --- |

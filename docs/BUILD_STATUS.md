@@ -11,11 +11,13 @@ The published Linux x86_64 runtime verified canonical GitHub main at `a72546c479
 | Phase | Cloud status |
 | --- | --- |
 | 1. World survey | Partial. Acquired a bounded OSM extract and documented coverage and unresolved anchors. Boundary and local verification remain open. |
-| 2. Whole-area foundation | Partial. The village guide displays genuine roads, railway and station point in a regional source view. Playable 3D roads and landmark placements still need integration. |
+| 2. Whole-area foundation | Partial. The Guide now opens a playable 3D map area with source-aligned roads, rail and station point. The prototype district retains its gameplay and saved position. Terrain, landmark models, named market connections and local verification remain open. |
 | 3. Playable demonstration | Prototype playable. Local prayer timing and licensed azan remain open. |
 | 4. First full gameplay release | Partial. Added school tutoring and teaching progression and a tea stall with stock, sales cooldowns and saved progress. Required markets, shopkeeping and further jobs remain open. |
 | 5. Local detail and depth | Partial prototype references and art. Current signage, facades and local review remain open. |
 | 6. Expansion | Pending. |
+
+The mapped-area visit passed in cloud Chromium at 1280×800 desktop and Android-emulated 393×852 portrait and 852×393 landscape. Keyboard and touch movement, linked attribution, frozen village time, return, and reload with a prior version-one save were verified. A simulated HTTP 503 kept the village playable and the next successful request entered the region without reloading.
 
 The geographic acquisition result and its limits are recorded in [MAP_SOURCES.md](MAP_SOURCES.md).
 

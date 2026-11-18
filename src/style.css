@@ -71,6 +71,7 @@ kbd{font-family:inherit;font-size:.82em;font-weight:700;display:inline-block;bor
 .game-toolbar button:hover{background:#dce6d6}
 .game-toolbar svg{width:19px;height:19px}
 .build-mark{position:absolute;right:31px;top:127px;font-size:8px;letter-spacing:.12em;opacity:.85;color:#f9f5e3;text-shadow:0 1px 6px #122a1e}
+.build-mark a{color:inherit;pointer-events:auto;display:inline-flex;align-items:center;min-height:44px}
 .build-mark span{font-size:8px;letter-spacing:0;margin-left:7px}
 .touch-controls{display:none}
 .panel-scrim{position:absolute;inset:0;background:#0b251c66;display:flex;align-items:center;justify-content:flex-end;padding:28px;pointer-events:auto}
