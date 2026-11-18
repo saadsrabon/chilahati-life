@@ -1,0 +1,4 @@
+# Chilahati Life
+
+A browser-first 3D village life simulation for Android and PC. Full agreed Chilahati region is the final scope, including station, post office, Botolganj, Kazirhat, Boaed Bazar (name unresolved) and Bouer Bazar. Player walks, drives vans/bicycles/motorcycles, earns and spends, studies, borrows, buys property and may steal with simulated consequences. Real road geometry and Bengali landmarks are essential. This initial playable build must honestly distinguish verified geographic data from illustrative landmark art. No fabricated azan recitation: support a user-approved/licensed recording later. Gameplay first; interface should recede around the 3D village. User authorized autonomous development, private GitHub repo creation, pushes and merges. Target check-in 18 November 2026 16:30 Asia/Dhaka.
+
