@@ -69,10 +69,18 @@ export function createWorld(scene: THREE.Scene): WorldResult {
   box(station, 0, 0.35, 0, 42, 0.7, 12, '#c9b89a');
   box(station, 0, 3.05, -0.8, 36, 5.4, 8, '#a95949');
   for(const yy of [0.95,3.25,5.3])box(station,0,yy,3.25,36.1,0.2,0.13,'#c3c4b5');
-  for(let row=0;row<10;row++)for(let j=0;j<24;j++){
-    const xx=-17.5+j*1.5+(row%2?0.72:0);
-    if(xx<17.8)box(station,xx,0.7+row*0.47,3.29,1.39,0.025,0.015,'#c28a76',false);
+  const brickJoints = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1.39, 0.025, 0.015), material('#c28a76'), 240,
+  );
+  const jointTransform = new THREE.Matrix4();
+  for (let row = 0; row < 10; row++) {
+    for (let column = 0; column < 24; column++) {
+      const x = -17.5 + column * 1.5 + (row % 2 ? 0.72 : 0);
+      brickJoints.setMatrixAt(row * 24 + column, jointTransform.makeTranslation(x, 0.7 + row * 0.47, 3.29));
+    }
   }
+  brickJoints.receiveShadow = true;
+  station.add(brickJoints);
   const roofMaterial = material('#d8dcd2');roofMaterial.side=THREE.DoubleSide;
   for(let bay=-3;bay<=3;bay++){
     const shape=new THREE.Shape();shape.moveTo(-2.7,6.35);shape.lineTo(0,8.1);shape.lineTo(2.7,6.35);shape.lineTo(2.7,6.13);shape.lineTo(0,7.88);shape.lineTo(-2.7,6.13);shape.closePath();

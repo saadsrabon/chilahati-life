@@ -23,6 +23,8 @@ Cloud Chromium 156 rendered the source map at 1280×800 desktop and at 393×852 
 
 Browser checks also opened a tea stall on desktop, served an order, checked the sale cooldown and focus, restocked, and reloaded with the same cash and stock. Pixel 7 emulation used a save at the school with the teaching prerequisites met, completed a paid class via touch, and confirmed the daily limit. Twelve simulation tests and the production build passed, including migration from prior version-one saves.
 
+A station rendering follow-up batches 240 facade details into one instanced mesh. At the same 1280×800 spawn view and low graphics setting, cloud Chromium measured 477 WebGL draws per frame before and 238 after. The station facade matched visually in the two captures. SwiftShader frame-rate samples overlapped at roughly 5–6 FPS, so this checkpoint establishes lower draw-call overhead. Physical-device performance remains open.
+
 ## Implemented prototype features
 
 - Interactive Three.js village scene with a station, railway, market scenery, Bengali signs, mosque, post office, school and homes. Current landmark models and facades are illustrative.
