@@ -18,7 +18,11 @@ npm run build
 
 ## Status
 
-First playable prototype in active development. Geographic source coverage and current landmark appearance are under verification. Procedural facades and fictional NPCs are illustrative. This is not a claim that every building or named market has been surveyed or recreated.
+The first playable prototype supports walking, van/bicycle/motorcycle rental and purchase, a delivery job, shopping, study, loans, a house purchase, theft, police consequences and local saves.
+
+After building, open dist/standalone.html directly for a self-contained preview, or serve dist with your usual static host.
+
+The full Chilahati reconstruction remains in active development. Geographic source coverage and current landmark appearance are under verification. Procedural facades and fictional NPCs are illustrative. This is not a claim that every building or named market has been surveyed or recreated.
 
 ## Controls
 
