@@ -40,4 +40,3 @@ Road/rail snapshots, when available, are credited to OpenStreetMap contributors 
 
 No real azan audio is bundled until a suitable recording is approved and sourced.
 
-
