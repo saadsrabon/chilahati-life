@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { bicycle, box, cylinder, material, motorcycle, person, sign, sphere, tree } from './scene-assets';
+import { animatePerson, bicycle, box, cylinder, material, motorcycle, person, sign, sphere, tree } from './scene-assets';
 
 export interface WorldResult {
   spawn: THREE.Vector3;
@@ -63,18 +63,39 @@ export function createWorld(scene: THREE.Scene): WorldResult {
     return g;
   }
 
-  // Railway station and platform. The façade is a reference-ready prototype.
+  // Station reference: modern red-brick walls, folded concrete canopy and silver columns.
+  // Public photos establish these visible features; dimensions remain illustrative.
   const station = new THREE.Group(); station.position.set(0, 0, -27); village.add(station);
   box(station, 0, 0.35, 0, 42, 0.7, 12, '#c9b89a');
-  box(station, 0, 2.9, -0.8, 34, 4.9, 8, '#eadab5');
-  box(station, 0, 5.6, -0.7, 37, 0.45, 13, '#ad6047');
-  for (let i = -3; i <= 3; i++) {
-    box(station, i * 4.7, 2.25, 3.3, 1.6, 3.2, 0.2, '#3c6666');
-    cylinder(station, i * 5.4, 2.55, 5.3, 0.2, 0.25, 4.7, '#e7d6ae', 8);
+  box(station, 0, 3.05, -0.8, 36, 5.4, 8, '#a95949');
+  for(const yy of [0.95,3.25,5.3])box(station,0,yy,3.25,36.1,0.2,0.13,'#c3c4b5');
+  for(let row=0;row<10;row++)for(let j=0;j<24;j++){
+    const xx=-17.5+j*1.5+(row%2?0.72:0);
+    if(xx<17.8)box(station,xx,0.7+row*0.47,3.29,1.39,0.025,0.015,'#c28a76',false);
   }
-  box(station, 0, 4.7, 5.3, 39, 0.4, 0.5, '#cfbc8f');
-  sign(station, 'চিলাহাটি', 0, 4.47, 5.65, 9.1, 2.05, '#124d4c', '#fff7dc', 'CHILAHATI RAILWAY STATION');
-  sign(station, 'টিকিট কাউন্টার', -10.2, 3.3, 3.48, 3.2, 0.8, '#244f51');
+  const roofMaterial = material('#d8dcd2');roofMaterial.side=THREE.DoubleSide;
+  for(let bay=-3;bay<=3;bay++){
+    const shape=new THREE.Shape();shape.moveTo(-2.7,6.35);shape.lineTo(0,8.1);shape.lineTo(2.7,6.35);shape.lineTo(2.7,6.13);shape.lineTo(0,7.88);shape.lineTo(-2.7,6.13);shape.closePath();
+    const roof=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:16.5,bevelEnabled:false}),roofMaterial);
+    roof.position.set(bay*5.4,0,-8.8);roof.castShadow=true;roof.receiveShadow=true;station.add(roof);
+  }
+  for (let i = -3; i <= 3; i++) {
+    box(station, i * 4.7, 2.45, 3.4, 2.1, 3.7, 0.16, '#385d60');
+    box(station, i * 4.7, 2.45, 3.51, 0.065, 3.7, 0.06, '#adb9b2');
+    cylinder(station, i * 5.4, 3.32, 6.6, 0.13, 0.16, 6.05, '#aab9b8', 12);
+  }
+  box(station, 0, 5.75, 3.5, 37.5, 0.25, 0.4, '#bfc7c0');
+  sign(station, 'চিলাহাটি রেলওয়ে স্টেশন', 0, 5.13, 6.8, 15.8, 1.9, '#1b4f68', '#fff9e7', 'CHILAHATI RAILWAY STATION');
+  sign(station, 'টিকিট কাউন্টার', -10.2, 3.6, 3.58, 3.2, 0.8, '#29576c');
+  // The station forecourt uses repeating red/charcoal pavers rather than a generic plaza.
+  const pavers=new THREE.InstancedMesh(new THREE.BoxGeometry(1.1,0.025,1.1),material('#9e5349'),420);
+  const paverTransform=new THREE.Object3D();const dark=new THREE.Color('#525b55'),red=new THREE.Color('#a95d50');
+  for(let index=0;index<420;index++){const col=index%30,row=Math.floor(index/30);paverTransform.position.set(-16.5+col*1.13,0.15,7.5+row*1.13);paverTransform.updateMatrix();pavers.setMatrixAt(index,paverTransform.matrix);pavers.setColorAt(index,(row+col)%3===0?dark:red);}
+  pavers.receiveShadow=true;station.add(pavers);
+  for(const side of [-1,1]){
+    box(station,side*21.8,0.8,11,0.12,0.12,12,'#535e57');
+    for(let k=0;k<5;k++){const xx=side*21.8,zz=6+k*2.5;box(station,xx,0.5,zz,0.25,1,0.25,k%2?'#f0e9cf':'#a94f43');}
+  }
   box(station, 0, 0.1, 7, 13, 0.2, 2, '#b6a183');
   box(station, 0, 0.18, 5.8, 13, 0.36, 1.5, '#c9b798');
   obstacle(0, -27.8, 35, 8.5); landmark('station', 'চিলাহাটি রেলওয়ে স্টেশন', 0, -20);
@@ -209,7 +230,7 @@ export function createWorld(scene: THREE.Scene): WorldResult {
   for (let i = 0; i < 18; i++) {
     const x = (i % 2 ? -1 : 1) * (8 + random() * 7);
     const z = -13 + random() * 100;
-    const npc = person(village, x, z, ['#c78456', '#85a398', '#c9b570', '#a77c83', '#697f8d'][i % 5]!, i % 3 === 0);
+    const npc = person(village, x, z, ['#c78456', '#85a398', '#c9b570', '#a77c83', '#697f8d'][i % 5]!, i % 3 === 0, i % 5 === 1?'salwar':i % 3 === 0?'lungi':'kurta');
     animated.push({ group: npc, x, z, phase: random() * Math.PI * 2, travel: i % 4 === 0 ? 0 : 4 + random() * 8 });
   }
   const flag = new THREE.Group(); flag.position.set(72, 0, 48); village.add(flag);
@@ -225,7 +246,7 @@ export function createWorld(scene: THREE.Scene): WorldResult {
         const phase = time * 0.22 + item.phase;
         item.group.position.z = item.z + Math.sin(phase) * item.travel;
         item.group.rotation.y = Math.cos(phase) > 0 ? 0 : Math.PI;
-        item.group.position.y = item.travel ? Math.sin(time * 5 + item.phase) * 0.025 : 0;
+        animatePerson(item.group,time*5+item.phase,item.travel?Math.abs(Math.cos(phase)):0);
       }
       // A passing arrival brings life to the railway without obstructing the player.
       const trainCycle = time % 180;

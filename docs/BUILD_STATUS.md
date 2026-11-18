@@ -40,3 +40,7 @@ Real azan audio is pending a licensed or permission-granted recording. Prayer ev
 2. Complete Android and desktop interaction, layout and performance QA, including walking, vehicle handling, purchases, jobs and save/reload.
 3. Attach approved azan recordings and verified per-mosque timing data with distance-based audio and duplicate-event protection.
 4. Expand businesses, property interiors, NPC routines and missions while preserving the complete regional scope.
+
+## Corrective character and station pass
+
+After user feedback, the station model now follows contemporary photo references with a folded concrete canopy, red-brick walls and silver columns. People wear Bangladeshi clothing and have articulated walking and seated poses. Exact dimensions and whole-area geography remain unverified. The corrective appearance has not been re-tested in a browser. See VISUAL_REFERENCES.md.
