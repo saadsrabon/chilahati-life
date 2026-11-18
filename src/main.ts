@@ -143,7 +143,7 @@ async function exploreRegion() {
   villageReturn = { position: position.clone(), yaw, pitch, heading: player.rotation.y };
   position.copy(region.spawn);
   yaw = region.yaw;
-  pitch = 0.42;
+  pitch = 0.26;
   player.rotation.y = (state.vehicle === 'walk' ? Math.PI : 0) - yaw;
   world.group.visible = false;
   region.group.visible = true;
