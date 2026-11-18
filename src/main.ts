@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import './style.css';
 import { createWorld } from './world';
-import { person, bicycle, motorcycle, box } from './scene-assets';
+import { person, bicycle, motorcycle, box, animatePerson } from './scene-assets';
 import { createGameState, performAction, advanceSimulation, saveGame, loadGame, formatTime } from './simulation';
 import { mountUI, type HUDView } from './ui';
 
@@ -33,16 +33,19 @@ const world = createWorld(scene);
 let state = loadGame() ?? createGameState();
 let started = false, yaw = 0, pitch = 0.31, speed = 0, elapsed = 0, hudTimer = 0, autosave = 0;
 let routeTarget: string | null = null, policeWarned = false;
+const walkVelocity = new THREE.Vector3();
+let gaitPhase = 0, gaitAmount = 0;
 const input = new Set<string>();
 const position = world.spawn.clone();
 const player = new THREE.Group(); scene.add(player);
-const onFoot = person(player, 0, 0, '#e6bd58');
+const onFoot = person(player, 0, 0, '#e6bd58', true, 'lungi');
 const cycle = bicycle(player, 0, 0, '#3a6f68');
 const motor = motorcycle(player, 0, 0, '#b35337');
 const van = bicycle(player, 0, 0, '#26776b', true);
 const rider = person(cycle, 0, 0, '#e6bd58'); rider.position.y = 0.3; rider.scale.setScalar(0.92);
 const motorRider = person(motor, 0, 0, '#e6bd58'); motorRider.position.y = 0.4; motorRider.scale.setScalar(0.92);
 const vanRider = person(van, 0, 0, '#e6bd58'); vanRider.position.y = 0.3; vanRider.scale.setScalar(0.92);
+for (const seatedRider of [rider, motorRider, vanRider]) { seatedRider.rotation.y = Math.PI; animatePerson(seatedRider, 0, 0, true); }
 const officer = new THREE.Group(); scene.add(officer); person(officer, 0, 0, '#38556b');
 officer.position.set(24, 0, 0); officer.visible = false;
 const marker = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.04, 24), new THREE.MeshBasicMaterial({color:'#f8dc80',transparent:true,opacity:0.8}));
@@ -132,7 +135,7 @@ function doAction(action:string) {
     if(action==='complete-job')routeTarget=null;
     if(action==='steal-bag'){policeWarned=false;ui.closePanel();ui.toast('A witness reported the missing bag. Police are looking for you. Return it at the post office.');}
     if(action==='return-bag'||action==='pay-fine')policeWarned=false;
-    if(before!==state.vehicle){speed=0;ui.closePanel();}
+    if(before!==state.vehicle){speed=0;walkVelocity.set(0,0,0);gaitAmount=0;ui.closePanel();}
     persist(true); updateHUD();
   }
 }
@@ -227,7 +230,12 @@ function frame(now:number){
       dx=(Math.sin(yaw)*forward+Math.cos(yaw)*turn)*walkingSpeed*dt;
       dz=(-Math.cos(yaw)*forward+Math.sin(yaw)*turn)*walkingSpeed*dt;
       const length=Math.hypot(dx,dz);if(length>walkingSpeed*dt){dx*=walkingSpeed*dt/length;dz*=walkingSpeed*dt/length;}
-      if(length>0.01){player.rotation.y=Math.atan2(dx,dz);onFoot.rotation.z=Math.sin(elapsed*12)*0.025;if(input.has('sprint'))state.energy=Math.max(0,state.energy-dt*0.25);}
+      walkVelocity.lerp(new THREE.Vector3(dx / Math.max(dt, 0.001), 0, dz / Math.max(dt, 0.001)), 1 - Math.exp(-dt * 10));
+      dx = walkVelocity.x * dt; dz = walkVelocity.z * dt;
+      const actualSpeed = Math.hypot(walkVelocity.x, walkVelocity.z);
+      gaitAmount = THREE.MathUtils.damp(gaitAmount, Math.min(actualSpeed / 3.8, 1), 10, dt);
+      gaitPhase += actualSpeed * dt * 4.1;
+      if(actualSpeed>0.08){const desiredAngle=Math.atan2(dx,dz);const difference=THREE.MathUtils.euclideanModulo(desiredAngle-player.rotation.y+Math.PI,Math.PI*2)-Math.PI;player.rotation.y+=difference*(1-Math.exp(-dt*12));if(input.has('sprint'))state.energy=Math.max(0,state.energy-dt*0.25);}
     }else{
       const max=state.vehicle==='motorcycle'?17:state.vehicle==='bicycle'?9.5:8;
       speed=THREE.MathUtils.damp(speed,forward*max,input.has('brake')?12:2.4,dt);
@@ -249,6 +257,7 @@ function frame(now:number){
     autosave+=dt;if(autosave>25){persist(true);autosave=0;}
   }
   player.position.copy(position);
+  animatePerson(onFoot, gaitPhase, state.vehicle === 'walk' && !paused ? gaitAmount : 0);
   onFoot.visible=state.vehicle==='walk';cycle.visible=state.vehicle==='bicycle';motor.visible=state.vehicle==='motorcycle';van.visible=state.vehicle==='van';
   if(!started){
     const angle=Math.sin(elapsed*0.055)*0.2;
