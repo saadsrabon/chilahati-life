@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "surface": "playable-village",
+  "mode": "experience",
+  "identity": "Warm Bengal village with an immersive 3D world and restrained cream and forest-green game controls",
+  "tokens": {
+    "colors": {
+      "forest": "#163e32",
+      "forestDeep": "#102e25",
+      "cream": "#faf5e9",
+      "gold": "#e5bc65",
+      "ink": "#213e32",
+      "muted": "#617265",
+      "worldBackground": "#d8e3ce"
+    },
+    "typography": {
+      "interface": "DM Sans, Noto Sans Bengali, sans-serif",
+      "bengali": "Noto Sans Bengali, sans-serif",
+      "numerals": "tabular-nums"
+    },
+    "radii": {
+      "panel": "16px",
+      "compactSurface": "12px",
+      "button": "10px"
+    },
+    "interaction": {
+      "minimumControlTarget": "44px",
+      "focusOutline": "3px solid #e5bc65",
+      "focusOffset": "4px"
+    },
+    "elevation": {
+      "panelShadow": "0 12px 36px #102b2229"
+    }
+  },
+  "constraints": [
+    "The actual 3D village is the primary surface",
+    "Android touch controls and PC keyboard and mouse controls share gameplay",
+    "Current facade artwork is illustrative pending local references",
+    "Bengali text must retain correct Unicode shaping",
+    "No fabricated azan recitation"
+  ],
+  "verification": {
+    "desktopInteractionCheck": "Observed 3D scene, start flow, motorcycle rental and save message",
+    "mobileQa": "Pending; available computer-use session had a current-URL limitation",
+    "fullVisualReview": "Not completed"
+  }
+}

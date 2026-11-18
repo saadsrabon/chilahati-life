@@ -232,7 +232,7 @@ function frame(now:number){
       const max=state.vehicle==='motorcycle'?17:state.vehicle==='bicycle'?9.5:8;
       speed=THREE.MathUtils.damp(speed,forward*max,input.has('brake')?12:2.4,dt);
       yaw+=turn*dt*(speed<0?-1:1)*1.5*(Math.abs(speed)>0.3?1:0.4);
-      dx=Math.sin(yaw)*speed*dt;dz=-Math.cos(yaw)*speed*dt;player.rotation.y=Math.PI-yaw;
+      dx=Math.sin(yaw)*speed*dt;dz=-Math.cos(yaw)*speed*dt;player.rotation.y=-yaw;
       if(state.vehicle==='bicycle'&&Math.abs(speed)>2)state.energy=Math.max(0,state.energy-dt*0.06);
     }
     if(Math.abs(position.x+dx)<1050&&!collides(position.x+dx,position.z))position.x+=dx;else speed*=0.3;
