@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import './style.css';
 import { createWorld } from './world';
+import { loadSourceMap } from './source-map';
 import { person, bicycle, motorcycle, box, animatePerson } from './scene-assets';
 import { createGameState, performAction, advanceSimulation, saveGame, loadGame, formatTime } from './simulation';
 import { mountUI, type HUDView } from './ui';
@@ -116,10 +117,10 @@ function doAction(action:string) {
   if(action==='transport'||action==='vehicle'){ui.openPanel('rental');return;}
   let at:string|undefined;
   if(/^(rent|buy)-(van|bicycle|motorcycle)$/.test(action))at='rental';
-  else if(['buy-tea','buy-meal'].includes(action))at='tea';
+  else if(['buy-tea','buy-meal','open-tea-stall','restock-tea-stall','serve-tea-order'].includes(action))at='tea';
   else if(['borrow','repay','deposit','withdraw'].includes(action))at='loan';
   else if(action==='buy-home'||action==='rest')at='home';
-  else if(action==='study'||action==='complete-job')at='school';
+  else if(['study','complete-job','tutor','teach'].includes(action))at='school';
   else if(action==='start-job'||action==='return-bag')at='job';
   else if(action==='steal-bag')at='bag';
   if(at&&!isNear(at)){
@@ -186,12 +187,19 @@ function updateHUD() {
   const distance=target?Math.round(Math.hypot(position.x-target.x,position.z-target.z)):0;
   const location=n.distance<28&&n.point?n.point.label:'Chilahati village';
   const job=state.job.active?'Deliver the parcel to the school'+(target?' · '+distance+' m':''):target?'Visit '+target.label+' · '+distance+' m':'Find your first job at the post office';
-  const view:HUDView={cash:state.cash,debt:state.debt,trust:state.trust,heat:state.heat,energy:state.energy,time:formatTime(state.minutes),day:state.day,vehicle:state.vehicle,location,prompt:n.point&&n.distance<8?n.point.label:'Explore the village',job,fps,ownedVehicles:state.ownedVehicles,ownsHome:state.ownsHome,inventory:state.inventory,log:state.log,started};
+  const gameMinute = (state.day - 1) * 1440 + state.minutes;
+  const work = {
+    lessons: state.lessonCount,
+    tutoringShifts: state.career.tutoringShifts,
+    sessionReady: gameMinute >= state.career.schoolAvailableAt,
+    taughtToday: state.career.lastTeachingDay === state.day,
+    teaStall: state.teaStall,
+    teaOrderReady: gameMinute >= state.teaStall.orderAvailableAt,
+  };
+  const view:HUDView={cash:state.cash,debt:state.debt,trust:state.trust,heat:state.heat,energy:state.energy,time:formatTime(state.minutes),day:state.day,vehicle:state.vehicle,location,prompt:n.point&&n.distance<8?n.point.label:'Explore the village',job,fps,ownedVehicles:state.ownedVehicles,ownsHome:state.ownsHome,inventory:state.inventory,log:state.log,started,work};
   ui.update(view); drawMap();
 }
-type MapSnapshot={source:string,origin:{lat:number,lon:number},roads:{points:{x:number,z:number}[],kind:string}[],rails:{points:{x:number,z:number}[]}[],pois:{name:string,x:number,z:number,kind:string}[]};
-let mapData:MapSnapshot|undefined;
-fetch('./data/chilahati-map.json').then(r=>r.ok?r.json():null).then(d=>{if(d?.roads?.length)mapData=d;}).catch(()=>{});
+const drawSourceMap = loadSourceMap();
 function drawMap(){
   const map=document.querySelector<HTMLCanvasElement>('#village-map');
   if(!map)return;
@@ -207,7 +215,7 @@ function drawMap(){
   for(const p of world.interactables){ctx.fillStyle='#b4862e';ctx.beginPath();ctx.arc(px(p.x),pz(p.z),4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#193f32';ctx.fillText(p.label,px(p.x)+8,pz(p.z)-8);}
   ctx.fillStyle='#c8543b';ctx.beginPath();ctx.arc(px(position.x),pz(position.z),6,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='#193f32';ctx.font='bold 13px system-ui';ctx.fillText('Playable station-area guide · illustrative layout',15,h-38);
-  ctx.font='12px system-ui';ctx.fillText(mapData?'OSM snapshot collected; regional integration is in progress.':'Whole-area road survey is in progress.',15,h-18);
+  drawSourceMap();
 }
 let frameCount=0,fps=60,fpsTime=0;
 let last=performance.now();
@@ -215,7 +223,12 @@ const desiredCamera=new THREE.Vector3();
 const targetLook=new THREE.Vector3();
 function frame(now:number){
   requestAnimationFrame(frame);
-  const dt=Math.min((now-last)/1000,0.05);last=now;elapsed+=dt;frameCount++;fpsTime+=dt;
+  const frameSeconds = (now - last) / 1000;
+  const dt = Math.min(frameSeconds, 0.05);
+  last = now;
+  elapsed += dt;
+  frameCount++;
+  fpsTime += frameSeconds;
   if(fpsTime>1){fps=Math.round(frameCount/fpsTime);frameCount=0;fpsTime=0;}
   const paused=ui.isPanelOpen();
   if(started&&!paused){

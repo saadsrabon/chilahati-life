@@ -17,6 +17,8 @@ export interface GameState {
   inventory: { tea: number; meals: number };
   job: { active: boolean; stage: number; completed: number };
   lessonCount: number;
+  career: { tutoringShifts: number; schoolAvailableAt: number; lastTeachingDay: number };
+  teaStall: { owned: boolean; ingredients: number; ordersServed: number; orderAvailableAt: number };
   stats: { earned: number; rides: number; stolen: number };
   log: string[];
   settings: { quality: 'low' | 'high'; sound: boolean };
@@ -30,6 +32,12 @@ export interface GameState {
 export interface ActionResult { ok: boolean; message: string }
 export const SAVE_KEY = 'chilahati-life-save-v1';
 export const GAME_MINUTES_PER_SECOND = 0.4;
+export const SCHOOL_WORK = {
+  tutoringLessons: 2, teacherLessons: 4, teacherExperience: 2, tutoringPay: 85, teacherPay: 180,
+} as const;
+export const TEA_STALL = {
+  openingCost: 350, stockCost: 40, stockPack: 5, maxStock: 15, pricePerOrder: 24,
+} as const;
 /** Illustrative GAME-clock schedule, not Chilahati's verified prayer timetable. */
 export const DEMO_PRAYER_SCHEDULE = [
   { name: 'Fajr', minutes: 5 * 60 },
@@ -49,6 +57,8 @@ export function createGameState(): GameState {
     day: 1, minutes: 8 * 60 + 10, vehicle: 'walk', ownedVehicles: [], ownsHome: false,
     inventory: { tea: 0, meals: 0 }, job: { active: false, stage: 0, completed: 0 },
     lessonCount: 0, stats: { earned: 0, rides: 0, stolen: 0 },
+    career: { tutoringShifts: 0, schoolAvailableAt: 0, lastTeachingDay: 0 },
+    teaStall: { owned: false, ingredients: 0, ordersServed: 0, orderAvailableAt: 0 },
     log: ['Welcome to Chilahati. Your first day is yours to choose.'],
     settings: { quality: 'low', sound: false }, lastAzanDay: 1, lastAzanIndex: 0,
     bagStatus: 'available', freeRideAvailableAt: 0, studyAvailableAt: 0,
@@ -157,6 +167,61 @@ export function performAction(state: GameState, action: string): ActionResult {
       state.trust = clamp(state.trust + 3, 0, 100);
       state.studyAvailableAt = now(state) + 30;
       return record(state, `Lesson ${state.lessonCount} completed. Knowledge and local trust improved.`);
+    case 'tutor':
+    case 'teach': {
+      const teaching = action === 'teach';
+      if (state.lessonCount < (teaching ? SCHOOL_WORK.teacherLessons : SCHOOL_WORK.tutoringLessons)) {
+        return fail('Attend more lessons to qualify for this work.');
+      }
+      if (teaching && state.career.tutoringShifts < SCHOOL_WORK.teacherExperience) {
+        return fail('Complete two tutoring sessions to join the teaching roster.');
+      }
+      if (teaching && state.career.lastTeachingDay >= state.day) return fail('Your class has finished for today.');
+      if (now(state) < state.career.schoolAvailableAt) return fail('The next school session starts later.');
+      const energyCost = teaching ? 16 : 10;
+      if (state.energy < energyCost) return fail('Have tea or a meal before starting work.');
+      state.energy -= energyCost;
+      state.career.schoolAvailableAt = now(state) + (teaching ? 60 : 45);
+      state.trust = clamp(state.trust + (teaching ? 4 : 2), 0, 100);
+      if (teaching) {
+        state.career.lastTeachingDay = state.day;
+        earn(state, SCHOOL_WORK.teacherPay);
+        return record(state, `Class finished. The pupils can multiply mangoes, although they can still make them disappear. +${money(SCHOOL_WORK.teacherPay)}`);
+      }
+      state.career.tutoringShifts += 1;
+      earn(state, SCHOOL_WORK.tutoringPay);
+      return record(state, `Tutoring finished. The missing homework turned up inside the lunch tin. +${money(SCHOOL_WORK.tutoringPay)}`);
+    }
+    case 'open-tea-stall':
+      if (state.teaStall.owned) return fail('This counter already belongs to you.');
+      if (!spend(state, TEA_STALL.openingCost)) return fail(`The counter costs ${money(TEA_STALL.openingCost)} to open.`);
+      state.teaStall.owned = true;
+      state.teaStall.ingredients = TEA_STALL.stockPack;
+      return record(state, 'The kettle is yours! You have ingredients for five orders.');
+    case 'restock-tea-stall':
+      if (!state.teaStall.owned) return fail('Open the counter first.');
+      if (state.teaStall.ingredients + TEA_STALL.stockPack > TEA_STALL.maxStock) return fail('The shelf is full. Serve a few more customers first.');
+      if (!spend(state, TEA_STALL.stockCost)) return fail(`Ingredients cost ${money(TEA_STALL.stockCost)}.`);
+      state.teaStall.ingredients += TEA_STALL.stockPack;
+      return record(state, `The shelf is stocked. Ingredients for ${state.teaStall.ingredients} orders.`);
+    case 'serve-tea-order': {
+      if (!state.teaStall.owned) return fail('Open the counter first.');
+      if (now(state) < state.teaStall.orderAvailableAt) return fail('The next customer is still on their way.');
+      if (state.teaStall.ingredients < 1) return fail('The kettle is ready. Restock the ingredients.');
+      if (state.energy < 4) return fail('Take a short break for food or tea before serving.');
+      state.energy -= 4;
+      state.teaStall.ingredients -= 1;
+      state.teaStall.ordersServed += 1;
+      state.teaStall.orderAvailableAt = now(state) + 12;
+      earn(state, TEA_STALL.pricePerOrder);
+      const customers = [
+        'The first customer requested half a spoon of sugar and a full spoon of gossip.',
+        'The customer asked for strong tea. The spoon stood up in it.',
+        'A passenger finished their tea just as someone yelled “train!”',
+      ];
+      const customer = customers[(state.teaStall.ordersServed - 1) % customers.length];
+      return record(state, `${customer} +${money(TEA_STALL.pricePerOrder)}`);
+    }
     case 'start-job':
       if (state.job.active) return fail('Finish your current delivery before accepting another.');
       if (state.energy < 5) return fail('Have a little food or tea before taking a delivery.');
@@ -289,17 +354,34 @@ export function normalizeSavedGame(value: unknown): GameState | null {
   const inventory = value.inventory;
   const stats = value.stats;
   const settings = value.settings;
+  const day = bounded(value.day, 1, 100000, true);
+  const career = isRecord(value.career) ? value.career : {};
+  const teaStall = isRecord(value.teaStall) ? value.teaStall : {};
+  const ownsTeaStall = teaStall.owned === true;
+  const optionalNumber = (field: unknown, max: number, integer = false) =>
+    finite(field) ? bounded(field, 0, max, integer) : 0;
   return {
     version: 1,
     cash: bounded(value.cash, 0, 10_000_000), bank: bounded(value.bank, 0, 10_000_000), debt: bounded(value.debt, 0, 2500),
     trust: bounded(value.trust, 0, 100), heat: bounded(value.heat, 0, 100), energy: bounded(value.energy, 0, 100),
-    day: bounded(value.day, 1, 100000, true), minutes: bounded(value.minutes, 0, 1439.999),
+    day, minutes: bounded(value.minutes, 0, 1439.999),
     vehicle: value.vehicle as Vehicle,
     ownedVehicles: [...new Set(value.ownedVehicles.filter((vehicle): vehicle is string => typeof vehicle === 'string' && ['van', 'bicycle', 'motorcycle'].includes(vehicle)))],
     ownsHome: value.ownsHome,
     inventory: { tea: bounded(inventory.tea, 0, 100000, true), meals: bounded(inventory.meals, 0, 100000, true) },
     job: { active: job.active === true, stage: job.active ? 1 : 0, completed: bounded(job.completed, 0, 100000, true) },
     lessonCount: bounded(value.lessonCount, 0, 100000, true),
+    career: {
+      tutoringShifts: optionalNumber(career.tutoringShifts, 100000, true),
+      schoolAvailableAt: optionalNumber(career.schoolAvailableAt, 144_000_000),
+      lastTeachingDay: optionalNumber(career.lastTeachingDay, day, true),
+    },
+    teaStall: {
+      owned: ownsTeaStall,
+      ingredients: ownsTeaStall ? optionalNumber(teaStall.ingredients, TEA_STALL.maxStock, true) : 0,
+      ordersServed: ownsTeaStall ? optionalNumber(teaStall.ordersServed, 100000, true) : 0,
+      orderAvailableAt: ownsTeaStall ? optionalNumber(teaStall.orderAvailableAt, 144_000_000) : 0,
+    },
     stats: { earned: bounded(stats.earned, 0, 100_000_000), rides: bounded(stats.rides, 0, 100000, true), stolen: bounded(stats.stolen, 0, 100000, true) },
     log: (value.log as string[]).slice(0, 12).map(item => item.slice(0, 240)),
     settings: { quality: settings.quality as 'low' | 'high', sound: settings.sound === true },

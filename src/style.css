@@ -114,6 +114,7 @@ kbd{font-family:inherit;font-size:.82em;font-weight:700;display:inline-block;bor
 .village-guide strong{font-size:12px;font-weight:600}
 .village-guide div>span:last-child{font-size:10px;color:#687960;line-height:1.5}
 .coverage-copy{font-size:12px;line-height:1.9;color:#53664f;margin:0}
+#source-map:not([hidden]){display:block;width:100%;height:auto;border-radius:12px}
 #village-map{display:block;width:100%;height:auto;aspect-ratio:700/520;background:#e3e9d3;border-radius:12px}
 .map-caption{font-size:10px;line-height:1.65;color:#687760;margin:9px 0 18px}
 .setting-row{display:flex;align-items:center;justify-content:space-between;gap:15px;min-height:76px;padding:13px 0;border-top:1px solid #cbd4c4}

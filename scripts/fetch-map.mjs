@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,10 +7,18 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const origin = { lat: 26.24314, lon: 88.79631 };
 const bounds = { south: 26.225, west: 88.775, north: 26.265, east: 88.825 };
 const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
-const query = `[out:json][timeout:35];(way[highway](${bbox});way[railway](${bbox});way[building](${bbox});nwr[amenity~"school|college|post_office|place_of_worship|marketplace"](${bbox});node[railway=station](${bbox});node[shop](${bbox});nwr[tourism=hotel](${bbox}););out geom center tags;`;
+const query = `[out:json][timeout:35];(way[highway](${bbox});way[railway](${bbox});way[building](${bbox});nwr[amenity~"school|college|post_office|place_of_worship|marketplace"](${bbox});node[railway=station](${bbox});node[shop](${bbox});nwr[tourism=hotel](${bbox}););out body geom;`;
 const endpoints = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
 let responseData;
 let sourceUrl;
+let sourceQuery;
+let fetchedAt;
+function validate(data) {
+  if (data.remark) throw new Error(data.remark);
+  const hasWay = (tag) => data.elements?.some(e => e.type === 'way' && e.tags?.[tag] &&
+    e.geometry?.filter(p => p && Number.isFinite(p.lat) && Number.isFinite(p.lon)).length > 1);
+  if (!hasWay('highway') || !hasWay('railway')) throw new Error('Road or rail geometry missing');
+}
 for (const endpoint of endpoints) {
   try {
     const response = await fetch(endpoint, {
@@ -20,10 +29,35 @@ for (const endpoint of endpoints) {
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
-    if (!Array.isArray(data.elements)) throw new Error('OSM elements missing');
+    validate(data);
     responseData = data;
     sourceUrl = endpoint;
+    sourceQuery = query;
+    fetchedAt = new Date().toISOString();
     break;
+  } catch (error) {
+    console.error(`${endpoint}: ${error.message}`);
+  }
+}
+if (!responseData) {
+  const endpoint = 'https://www.openstreetmap.org/api/0.6/map';
+  sourceQuery = `bbox=${bounds.west},${bounds.south},${bounds.east},${bounds.north}`;
+  try {
+    const response = await fetch(`${endpoint}?${sourceQuery}`, {
+      headers: { 'user-agent': 'ChilahatiLifePrototype/0.1 public-map-snapshot' },
+      signal: AbortSignal.timeout(45000),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const parsed = spawnSync('python3', [path.join(root, 'scripts/osm-xml.py')], {
+      input: Buffer.from(await response.arrayBuffer()), encoding: 'utf8', maxBuffer: 32 * 1024 * 1024,
+    });
+    if (parsed.error) throw parsed.error;
+    if (parsed.status !== 0) throw new Error(parsed.stderr.trim() || 'OSM XML conversion failed');
+    const data = JSON.parse(parsed.stdout);
+    validate(data);
+    responseData = data;
+    sourceUrl = endpoint;
+    fetchedAt = new Date().toISOString();
   } catch (error) {
     console.error(`${endpoint}: ${error.message}`);
   }
@@ -39,13 +73,20 @@ const roads = [], rails = [], pois = [], buildings = [];
 for (const e of responseData.elements) {
   const tags = e.tags || {};
   const id = `${e.type}/${e.id}`;
-  const points = (e.geometry || []).filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lon)).map(project);
+  const geometry = (e.geometry || []).filter(p => p && Number.isFinite(p.lat) && Number.isFinite(p.lon));
+  const points = geometry.map(project);
   if (e.type === 'way' && tags.highway && points.length > 1) roads.push({ id, name: name(tags), kind: tags.highway, points });
   if (e.type === 'way' && tags.railway && points.length > 1) rails.push({ id, name: name(tags), kind: tags.railway, points });
   if (e.type === 'way' && tags.building && points.length > 2) buildings.push({ id, name: name(tags), points, levels: Math.max(1, Math.min(12, Number.parseInt(tags['building:levels'] || '1', 10) || 1)) });
-  if (tags.amenity || tags.railway === 'station' || tags.shop || tags.tourism === 'hotel') {
-    const p = e.type === 'node' ? e : e.center;
-    if (p && Number.isFinite(p.lat) && Number.isFinite(p.lon)) pois.push({ id, name: name(tags), kind: tags.amenity === 'place_of_worship' && tags.religion === 'muslim' ? 'mosque' : tags.amenity || tags.railway || tags.shop || tags.tourism, ...project(p), tags: { religion: tags.religion, denomination: tags.denomination } });
+  if (['school', 'college', 'post_office', 'place_of_worship', 'marketplace'].includes(tags.amenity) || tags.railway === 'station' || tags.shop || tags.tourism === 'hotel') {
+    // Use an OSM node directly or the bounding-box midpoint of a mapped way.
+    // A midpoint is a display marker, never an entrance.
+    const midpoint = (key) => {
+      const values = geometry.map(point => point[key]);
+      return (Math.min(...values) + Math.max(...values)) / 2;
+    };
+    const p = e.type === 'node' ? e : e.center ?? (geometry.length ? { lat: midpoint('lat'), lon: midpoint('lon') } : null);
+    if (p && Number.isFinite(p.lat) && Number.isFinite(p.lon)) pois.push({ id, name: name(tags), kind: tags.amenity === 'place_of_worship' && tags.religion === 'muslim' ? 'mosque' : tags.amenity || tags.railway || tags.shop || tags.tourism, ...project(p), lat: p.lat, lon: p.lon, tags: { religion: tags.religion, denomination: tags.denomination } });
   }
 }
 const output = {
@@ -54,8 +95,8 @@ const output = {
   license: 'ODbL-1.0',
   licenseUrl: 'https://www.openstreetmap.org/copyright',
   sourceUrl,
-  query,
-  fetchedAt: new Date().toISOString(),
+  query: sourceQuery,
+  fetchedAt,
   osmTimestamp: responseData.osm3s?.timestamp_osm_base || null,
   origin, bounds, roads, rails, pois, buildings,
 };
